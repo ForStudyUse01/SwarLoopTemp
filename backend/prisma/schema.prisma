@@ -1,0 +1,189 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  password     String
+  displayName  String
+  avatarUrl    String?
+  role         Role     @default(USER)
+  preferences  Json?
+  consentFlags Json?
+  createdAt    DateTime @default(now())
+  lastLogin    DateTime?
+  isActive     Boolean  @default(true)
+
+  // Relations
+  playlists        Playlist[]
+  moodEvents       MoodEvent[]
+  recommendations  Recommendation[]
+  events          Event[]
+
+  @@map("users")
+}
+
+model Music {
+  id            String   @id @default(cuid())
+  title         String
+  artist        String
+  album         String?
+  duration      Int      // in seconds
+  audioUrl      String
+  genreTags     String[]
+  moodTags      String[]
+  audioFeatures Json?    // {tempo, key, valence, energy, etc.}
+  language      String?
+  uploadedBy    String?  // admin user id
+  createdAt     DateTime @default(now())
+  isActive      Boolean  @default(true)
+
+  // Relations
+  playlistTracks PlaylistTrack[]
+  recommendations RecommendationTrack[]
+
+  @@map("music")
+}
+
+model Article {
+  id        String   @id @default(cuid())
+  title     String
+  content   String   // markdown content
+  summary   String?
+  author    String
+  tags      String[]
+  createdAt DateTime @default(now())
+  isActive  Boolean  @default(true)
+
+  @@map("articles")
+}
+
+model Playlist {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isPublic    Boolean  @default(false)
+  ownerId     String
+  createdAt   DateTime @default(now())
+
+  // Relations
+  owner   User           @relation(fields: [ownerId], references: [id])
+  tracks  PlaylistTrack[]
+
+  @@map("playlists")
+}
+
+model PlaylistTrack {
+  id         String @id @default(cuid())
+  playlistId String
+  musicId    String
+  order      Int
+
+  // Relations
+  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  music    Music    @relation(fields: [musicId], references: [id])
+
+  @@unique([playlistId, musicId])
+  @@map("playlist_tracks")
+}
+
+model MoodEvent {
+  id          String     @id @default(cuid())
+  userId      String
+  source      MoodSource
+  label       String     // mood label (e.g., "happy", "sad", "anxious")
+  score       Float      // intensity 1-10
+  contextText String?    // optional text input
+  confidence  Float?     // confidence score for ML predictions
+  timestamp   DateTime   @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("mood_events")
+}
+
+model Recommendation {
+  id           String   @id @default(cuid())
+  userId       String
+  modelVersion String
+  reason       String   // explanation for recommendations
+  timestamp    DateTime @default(now())
+
+  // Relations
+  user   User                  @relation(fields: [userId], references: [id])
+  tracks RecommendationTrack[]
+
+  @@map("recommendations")
+}
+
+model RecommendationTrack {
+  id              String @id @default(cuid())
+  recommendationId String
+  musicId         String
+  score           Float  // recommendation score
+  reason          String // why this track was recommended
+
+  // Relations
+  recommendation Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+  music          Music          @relation(fields: [musicId], references: [id])
+
+  @@map("recommendation_tracks")
+}
+
+model Meditation {
+  id         String   @id @default(cuid())
+  title      String
+  duration   Int      // in seconds
+  audioUrl   String
+  difficulty String   // "beginner", "intermediate", "advanced"
+  createdAt  DateTime @default(now())
+  isActive   Boolean  @default(true)
+
+  @@map("meditations")
+}
+
+model Event {
+  id        String    @id @default(cuid())
+  userId    String
+  type      EventType
+  data      Json?     // additional event data
+  timestamp DateTime  @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("events")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum MoodSource {
+  SELF_REPORT
+  TEXT_ANALYSIS
+  VOICE_ANALYSIS
+}
+
+enum EventType {
+  PLAY
+  PAUSE
+  SKIP
+  LIKE
+  DISLIKE
+  MOOD_SUBMIT
+  PLAYLIST_CREATE
+  PLAYLIST_UPDATE
+  PLAYLIST_DELETE
+}
